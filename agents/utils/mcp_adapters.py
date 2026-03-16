@@ -54,29 +54,31 @@ def _extract_text_from_mcp_result(result: Any) -> str:
     return str(result)
 
 
-async def _call_mcp_stdio(
+async def _call_mcp_sse(
     *,
-    command: str,
-    args: list[str],
+    url: str,
     tool_name: str,
     payload: dict[str, Any],
     timeout_sec: float,
-    env: dict[str, str] | None,
+    headers: dict[str, str] | None,
+    sse_read_timeout: float,
 ) -> Any:
     try:
         mcp_module = importlib.import_module("mcp")
-        mcp_stdio_module = importlib.import_module("mcp.client.stdio")
+        mcp_sse_module = importlib.import_module("mcp.client.sse")
         ClientSession = getattr(mcp_module, "ClientSession")
-        StdioServerParameters = getattr(mcp_module, "StdioServerParameters")
-        stdio_client = getattr(mcp_stdio_module, "stdio_client")
+        sse_client = getattr(mcp_sse_module, "sse_client")
     except (ImportError, AttributeError) as exc:
         raise ImportError(
             "MCP adapter requires package 'mcp'. Install it with: pip install mcp"
         ) from exc
 
-    server_params = StdioServerParameters(command=command, args=args, env=env)
-
-    async with stdio_client(server_params) as (read_stream, write_stream):
+    async with sse_client(
+        url=url,
+        headers=headers,
+        timeout=timeout_sec,
+        sse_read_timeout=sse_read_timeout,
+    ) as (read_stream, write_stream):
         async with ClientSession(read_stream, write_stream) as session:
             await session.initialize()
             return await asyncio.wait_for(
@@ -88,23 +90,21 @@ async def _call_mcp_stdio(
 def create_mcp_node(
     *,
     node_name: str,
-    command: str,
-    args: list[str] | None = None,
+    url: str,
     tool_name: str = "run_agent",
     timeout_sec: float = 30.0,
-    env: dict[str, str] | None = None,
+    headers: dict[str, str] | None = None,
+    sse_read_timeout: float = 300.0,
 ) -> Any:
-    command_args = args or []
-
     async def mcp_node(state) -> Command[str]:
         payload = _state_to_payload(state)
-        result = await _call_mcp_stdio(
-            command=command,
-            args=command_args,
+        result = await _call_mcp_sse(
+            url=url,
             tool_name=tool_name,
             payload=payload,
             timeout_sec=timeout_sec,
-            env=env,
+            headers=headers,
+            sse_read_timeout=sse_read_timeout,
         )
         content = _extract_text_from_mcp_result(result)
         return Command(

@@ -54,7 +54,7 @@ def create_xxx_node(
 
 ### 2) MCP adapter (`adapter = "mcp"`)
 
-Your MCP server (stdio transport) must expose a tool (default `run_agent`) that accepts this payload shape:
+Your MCP server (SSE transport) must expose a tool (default `run_agent`) that accepts this payload shape:
 
 ```json
 {
@@ -85,11 +85,11 @@ Tool output should include text content; runtime will extract textual fields and
 | `model`         | string  | conditional | `null`    | Required when `adapter = "python"`. Passed into the Python factory callable. |
 | `temperature`   | float   | no       | `null`    | Optional. Passed into the Python factory callable. |
 | `provider`      | string  | conditional | `null`    | Required when `adapter = "python"`. Allowed values: `google`, `openai`, `anthropic`. |
-| `timeout_sec`   | float   | no       | `30.0`    | Timeout for `mcp` calls in seconds.                                        |
-| `mcp_command`   | string  | no       | `null`    | MCP server command. Required when `adapter = "mcp"`.                        |
-| `mcp_args`      | array   | no       | `[]`      | MCP server command arguments. Used when `adapter = "mcp"`.                  |
+| `timeout_sec`   | float   | no       | `30.0`    | Request timeout for `mcp` calls in seconds.                                |
+| `mcp_url`       | string  | conditional | `null`    | SSE endpoint URL of remote MCP server. Required when `adapter = "mcp"`.    |
+| `mcp_headers`   | table   | no       | `null`    | Optional HTTP headers for SSE connection (for example Authorization).      |
+| `mcp_sse_read_timeout` | float | no | `300.0` | SSE stream read timeout in seconds.                                         |
 | `mcp_tool`      | string  | no       | `"run_agent"` | MCP tool name to invoke. Used when `adapter = "mcp"`.                   |
-| `mcp_env`       | table   | no       | `null`    | Environment variables passed to MCP server process.                           |
 | `enabled`       | boolean | no       | `true`    | Set to `false` to disable the node without removing it from the config.     |
 
 ### `callable` path format
@@ -110,9 +110,9 @@ my_team.custom_agent:create_node
 ### MCP adapter
 
 - Set `adapter = "mcp"`.
-- Required field: `mcp_command`.
-- Optional: `mcp_args`, `mcp_tool`, `mcp_env`, `timeout_sec`.
-- Current transport is stdio MCP server process.
+- Required field: `mcp_url`.
+- Optional: `mcp_headers`, `mcp_sse_read_timeout`, `mcp_tool`, `timeout_sec`.
+- Current transport is SSE remote MCP server.
 
 ## Example
 
@@ -132,12 +132,12 @@ temperature = 0.0
 provider = "google"
 enabled = true
 
-# An MCP external agent (stdio)
+# An MCP external agent (SSE remote)
 [[nodes]]
 name = "external_mcp_agent"
 adapter = "mcp"
-mcp_command = "python"
-mcp_args = ["-m", "my_mcp_server"]
+mcp_url = "https://third-party.example.com/mcp/sse"
+# mcp_headers = { Authorization = "Bearer <token>" }
 mcp_tool = "run_agent"
 timeout_sec = 20
 enabled = false
