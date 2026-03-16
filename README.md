@@ -29,7 +29,7 @@ Example use cases:
 To run the agent locally, follow the steps below:
 
 
-1. Clone this repository and cd into **multiagents_framework** folder.
+1. Clone this repository.
 2. If you are using conda create new environment using:
     ```bash
     conda create -n env-name python=3.11
@@ -40,8 +40,8 @@ To run the agent locally, follow the steps below:
     pip install -r requirements.txt
 4. Replace .env.example with actual .env file
 5. Update the API keys in the .env file
-6. Get Google API key to use langchain-google-vertexai by following this:
-   <a href="https://python.langchain.com/docs/integrations/chat/google_vertex_ai_palm/" target="_blank">link</a>
+6. Get Google API key to use langchain_google_genai by following this:
+   <a href="https://docs.langchain.com/oss/python/integrations/chat/google_generative_ai" target="_blank">link</a>
 7. Get Langsmith API key by following this:
    <a href="https://docs.smith.langchain.com/observability" target="_blank">link</a>
 
