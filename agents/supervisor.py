@@ -137,9 +137,9 @@ def supervisor_node(state: State) -> Command[str]:
 # -------------------------------------------------------------
 
 graph = StateGraph(State)
-graph.add_node("supervisor", supervisor_node)
+graph.add_node("supervisor", supervisor_node, destinations=tuple(members) + (END,))
 for node_name, node_callable in node_callables.items():
-    graph.add_node(node_name, node_callable)
+    graph.add_node(node_name, node_callable, destinations=("supervisor",))
 
 graph.add_edge(START, "supervisor")
 agent = graph.compile()
