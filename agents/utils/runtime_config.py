@@ -22,7 +22,6 @@ class NodeConfig:
     name: str
     adapter: str = "python"
     callable_path: str | None = None
-    callable_type: str = "node"
     model: str | None = None
     temperature: float | None = None
     provider: str | None = None
@@ -54,43 +53,27 @@ def _import_callable(path: str) -> Callable:
 def _build_python_node(node: NodeConfig) -> Callable:
     if not node.callable_path:
         raise ValueError(f"Node '{node.name}' requires 'callable' for python adapter.")
+    if node.provider is None:
+        raise ValueError(
+            f"Node '{node.name}' uses adapter='python' and must set 'provider'."
+        )
+    if node.model is None:
+        raise ValueError(
+            f"Node '{node.name}' uses adapter='python' and must set 'model'."
+        )
 
     symbol = _import_callable(node.callable_path)
+    normalized_provider = validate_provider(node.provider, f"Node '{node.name}'")
+    kwargs = {"model": node.model, "provider": normalized_provider}
+    if node.temperature is not None:
+        kwargs["temperature"] = node.temperature
 
-    if node.callable_type == "node":
-        if node.model is not None or node.temperature is not None or node.provider is not None:
-            raise ValueError(
-                f"Node '{node.name}' sets model options but uses callable_type='node'. "
-                "Use callable_type='factory' to inject model/provider settings."
-            )
-        return symbol
-
-    if node.callable_type == "factory":
-        if node.provider is None:
-            raise ValueError(
-                f"Node '{node.name}' uses callable_type='factory' and must set 'provider'."
-            )
-        if node.model is None:
-            raise ValueError(
-                f"Node '{node.name}' uses callable_type='factory' and must set 'model'."
-            )
-        normalized_provider = validate_provider(node.provider, f"Node '{node.name}'")
-        kwargs = {}
-        kwargs["model"] = node.model
-        if node.temperature is not None:
-            kwargs["temperature"] = node.temperature
-        kwargs["provider"] = normalized_provider
-        produced = symbol(**kwargs)
-        if not callable(produced):
-            raise ValueError(
-                f"Factory callable '{node.callable_path}' did not return a callable node."
-            )
-        return produced
-
-    raise ValueError(
-        f"Invalid callable_type '{node.callable_type}' for node '{node.name}'. "
-        "Use 'node' or 'factory'."
-    )
+    produced = symbol(**kwargs)
+    if not callable(produced):
+        raise ValueError(
+            f"Factory callable '{node.callable_path}' did not return a callable node."
+        )
+    return produced
 
 
 def _build_http_node(node: NodeConfig) -> Callable:
@@ -143,7 +126,6 @@ def load_runtime_config(config_path: Path) -> tuple[SupervisorConfig, dict[str, 
             callable_path=(
                 str(node_item["callable"]) if node_item.get("callable") is not None else None
             ),
-            callable_type=str(node_item.get("callable_type", "node")),
             model=str(node_item["model"]) if node_item.get("model") is not None else None,
             temperature=(
                 float(node_item["temperature"])

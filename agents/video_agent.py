@@ -51,6 +51,3 @@ def create_video_node(
         )
 
     return video_node
-
-
-video_node = create_video_node()

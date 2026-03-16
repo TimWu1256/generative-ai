@@ -15,6 +15,83 @@ This project supports config-driven worker mounting for the supervisor graph.
 5. Set `enabled = true`.
 6. Restart the service.
 
+## Agent Contract (What You Must Implement)
+
+This section defines the minimum contract your agent must follow to be plug-and-play in this framework.
+
+### 1) Python adapter (`adapter = "python"`)
+
+Your `callable` must point to a **factory function** that returns a LangGraph node callable.
+
+- Factory signature (required):
+
+```python
+def create_xxx_node(
+      model: str,
+      provider: str,
+      temperature: float = 0.0,
+):
+      ...
+      def xxx_node(state) -> Command[str]:
+            ...
+            return Command(
+                  update={
+                        "messages": [AIMessage(content="...", name="xxx_agent")]
+                  },
+                  goto="supervisor",
+            )
+      return xxx_node
+```
+
+- Required behavior:
+   - Must return a callable node function.
+   - Node function must return `Command`.
+   - `goto` should route back to `"supervisor"`.
+   - Node should append one `AIMessage` with `name` set to your node name (recommended for supervisor tracking).
+
+- Runtime injection:
+   - `model`, `provider`, and optional `temperature` come from `config/agent_nodes.toml`.
+
+### 2) HTTP adapter (`adapter = "http"`)
+
+Your HTTP service should accept JSON request body:
+
+```json
+{
+   "messages": [
+      {"type": "human", "name": null, "content": "..."}
+   ],
+   "state": {
+      "next": "..."
+   }
+}
+```
+
+Response can be any of these keys (priority order used by runtime):
+
+```json
+{"content": "..."}
+{"output": "..."}
+{"response": "..."}
+{"text": "..."}
+{"message": "..."}
+```
+
+If none of these keys exist, runtime will stringify the response body.
+
+### 3) MCP adapter (`adapter = "mcp"`)
+
+Your MCP server (stdio transport) must expose a tool (default `run_agent`) that accepts the same payload shape as HTTP:
+
+```json
+{
+   "messages": [...],
+   "state": {...}
+}
+```
+
+Tool output should include text content; runtime will extract textual fields and route result back to supervisor.
+
 ## Parameter Reference
 
 ### `[supervisor]` section
@@ -32,10 +109,9 @@ This project supports config-driven worker mounting for the supervisor graph.
 | `name`          | string  | yes      | —         | Unique node name. Must match the routing keys used by the supervisor.        |
 | `adapter`       | string  | yes      | —         | Adapter type: `"python"`, `"http"`, `"mcp"`.                              |
 | `callable`      | string  | no       | `null`    | Python import path in `package.module:symbol` format. Required when `adapter = "python"`. |
-| `callable_type` | string  | no       | `"node"`  | How the callable is used. See **callable_type options** below.              |
-| `model`         | string  | conditional | `null`    | Required when `adapter = "python"` and `callable_type = "factory"`. |
-| `temperature`   | float   | no       | `null`    | Sampling temperature passed to the node factory. Only used when `callable_type = "factory"`. |
-| `provider`      | string  | conditional | `null`    | Required when `adapter = "python"` and `callable_type = "factory"`. Allowed values: `google`, `openai`, `anthropic`. |
+| `model`         | string  | conditional | `null`    | Required when `adapter = "python"`. Passed into the Python factory callable. |
+| `temperature`   | float   | no       | `null`    | Optional. Passed into the Python factory callable. |
+| `provider`      | string  | conditional | `null`    | Required when `adapter = "python"`. Allowed values: `google`, `openai`, `anthropic`. |
 | `endpoint`      | string  | no       | `null`    | HTTP target URL. Required when `adapter = "http"`.                          |
 | `method`        | string  | no       | `"POST"`  | HTTP method for external call. Used when `adapter = "http"`.                |
 | `headers`       | table   | no       | `null`    | HTTP headers table. Used when `adapter = "http"`.                           |
@@ -45,13 +121,6 @@ This project supports config-driven worker mounting for the supervisor graph.
 | `mcp_tool`      | string  | no       | `"run_agent"` | MCP tool name to invoke. Used when `adapter = "mcp"`.                   |
 | `mcp_env`       | table   | no       | `null`    | Environment variables passed to MCP server process.                           |
 | `enabled`       | boolean | no       | `true`    | Set to `false` to disable the node without removing it from the config.     |
-
-### `callable_type` options
-
-| Value       | When to use                                                                                   | Expected signature                                           |
-|-------------|-----------------------------------------------------------------------------------------------|--------------------------------------------------------------|
-| `"node"`    | The symbol **is** the node function itself. Model is baked into the function at definition time. | `def my_node(state) -> Command: ...`                         |
-| `"factory"` | The symbol **returns** a node function. Model and temperature from config are injected at startup. | `def create_node(model, temperature) -> Callable: ...`       |
 
 ### `callable` path format
 
@@ -64,9 +133,8 @@ package.module:symbol
 
 **Examples:**
 ```
-agents.image_agent:image_node          # callable_type = "node"
-agents.image_agent:create_image_node   # callable_type = "factory"
-my_team.custom_agent:create_node       # callable_type = "factory"
+agents.image_agent:create_image_node
+my_team.custom_agent:create_node
 ```
 
 ### HTTP adapter
@@ -98,18 +166,9 @@ provider = "google"
 name = "my_custom_agent"
 adapter = "python"
 callable = "my_team_agents.custom:create_my_custom_node"
-callable_type = "factory"
 model = "gemini-2.5-flash"
 temperature = 0.0
 provider = "google"
-enabled = true
-
-# A plain node — model is hardcoded inside the function
-[[nodes]]
-name = "my_simple_agent"
-adapter = "python"
-callable = "my_team_agents.simple:simple_node"
-callable_type = "node"
 enabled = true
 
 # An HTTP external agent
@@ -137,5 +196,31 @@ enabled = false
 - Disable a node without code changes by setting `enabled = false`.
 - Keep node names unique.
 - `provider` values are validated at startup. Allowed: `google`, `openai`, `anthropic`.
-- For `adapter = "python"` + `callable_type = "factory"`, both `model` and `provider` are required.
-- Factory callables must return a node function that routes back to `"supervisor"`.
+- For `adapter = "python"`, `callable` must point to a factory callable.
+- For `adapter = "python"`, both `model` and `provider` are required.
+- Python factory callables must return a node function that routes back to `"supervisor"`.
+
+## Minimal Python Agent Template
+
+Use this template when onboarding a new Python worker:
+
+```python
+from langchain_core.messages import AIMessage
+from langgraph.types import Command
+
+from agents.utils.llm_factory import create_chat_model
+
+
+def create_my_agent_node(model: str, provider: str, temperature: float = 0.0):
+   llm = create_chat_model(model=model, provider=provider, temperature=temperature)
+
+   def my_agent_node(state) -> Command[str]:
+      # Replace with your own logic/tool calls.
+      result_text = "your result"
+      return Command(
+         update={"messages": [AIMessage(content=result_text, name="my_agent")]},
+         goto="supervisor",
+      )
+
+   return my_agent_node
+```

@@ -54,6 +54,3 @@ def create_image_node(
         )
 
     return image_node
-
-
-image_node = create_image_node()
