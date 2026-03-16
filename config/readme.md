@@ -10,7 +10,7 @@ This project supports config-driven worker mounting for the supervisor graph.
 
 1. Add a worker entry under `[[nodes]]`.
 2. Set `name` to the node name used by the supervisor.
-3. Set `adapter` to one of `"python"`, `"http"`, `"mcp"`.
+3. Set `adapter` to one of `"python"`, `"mcp"`.
 4. Fill required fields for that adapter.
 5. Set `enabled = true`.
 6. Restart the service.
@@ -52,36 +52,9 @@ def create_xxx_node(
 - Runtime injection:
    - `model`, `provider`, and optional `temperature` come from `config/agent_nodes.toml`.
 
-### 2) HTTP adapter (`adapter = "http"`)
+### 2) MCP adapter (`adapter = "mcp"`)
 
-Your HTTP service should accept JSON request body:
-
-```json
-{
-   "messages": [
-      {"type": "human", "name": null, "content": "..."}
-   ],
-   "state": {
-      "next": "..."
-   }
-}
-```
-
-Response can be any of these keys (priority order used by runtime):
-
-```json
-{"content": "..."}
-{"output": "..."}
-{"response": "..."}
-{"text": "..."}
-{"message": "..."}
-```
-
-If none of these keys exist, runtime will stringify the response body.
-
-### 3) MCP adapter (`adapter = "mcp"`)
-
-Your MCP server (stdio transport) must expose a tool (default `run_agent`) that accepts the same payload shape as HTTP:
+Your MCP server (stdio transport) must expose a tool (default `run_agent`) that accepts this payload shape:
 
 ```json
 {
@@ -107,15 +80,12 @@ Tool output should include text content; runtime will extract textual fields and
 | Parameter       | Type    | Required | Default   | Description                                                                 |
 |-----------------|---------|----------|-----------|-----------------------------------------------------------------------------|
 | `name`          | string  | yes      | —         | Unique node name. Must match the routing keys used by the supervisor.        |
-| `adapter`       | string  | yes      | —         | Adapter type: `"python"`, `"http"`, `"mcp"`.                              |
+| `adapter`       | string  | yes      | —         | Adapter type: `"python"`, `"mcp"`.                                      |
 | `callable`      | string  | no       | `null`    | Python import path in `package.module:symbol` format. Required when `adapter = "python"`. |
 | `model`         | string  | conditional | `null`    | Required when `adapter = "python"`. Passed into the Python factory callable. |
 | `temperature`   | float   | no       | `null`    | Optional. Passed into the Python factory callable. |
 | `provider`      | string  | conditional | `null`    | Required when `adapter = "python"`. Allowed values: `google`, `openai`, `anthropic`. |
-| `endpoint`      | string  | no       | `null`    | HTTP target URL. Required when `adapter = "http"`.                          |
-| `method`        | string  | no       | `"POST"`  | HTTP method for external call. Used when `adapter = "http"`.                |
-| `headers`       | table   | no       | `null`    | HTTP headers table. Used when `adapter = "http"`.                           |
-| `timeout_sec`   | float   | no       | `30.0`    | Timeout for `http` and `mcp` calls in seconds.                               |
+| `timeout_sec`   | float   | no       | `30.0`    | Timeout for `mcp` calls in seconds.                                        |
 | `mcp_command`   | string  | no       | `null`    | MCP server command. Required when `adapter = "mcp"`.                        |
 | `mcp_args`      | array   | no       | `[]`      | MCP server command arguments. Used when `adapter = "mcp"`.                  |
 | `mcp_tool`      | string  | no       | `"run_agent"` | MCP tool name to invoke. Used when `adapter = "mcp"`.                   |
@@ -136,15 +106,6 @@ package.module:symbol
 agents.image_agent:create_image_node
 my_team.custom_agent:create_node
 ```
-
-### HTTP adapter
-
-- Set `adapter = "http"`.
-- Required field: `endpoint`.
-- Runtime sends a JSON payload with:
-   - `messages`: serialized conversation messages
-   - `state`: non-message state fields
-- Response parsing priority: `content` -> `output` -> `response` -> `text` -> `message`.
 
 ### MCP adapter
 
@@ -170,15 +131,6 @@ model = "gemini-2.5-flash"
 temperature = 0.0
 provider = "google"
 enabled = true
-
-# An HTTP external agent
-[[nodes]]
-name = "external_http_agent"
-adapter = "http"
-endpoint = "http://localhost:8080/infer"
-method = "POST"
-timeout_sec = 20
-enabled = false
 
 # An MCP external agent (stdio)
 [[nodes]]

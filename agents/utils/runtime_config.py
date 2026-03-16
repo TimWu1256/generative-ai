@@ -6,7 +6,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Callable
 
-from agents.utils.external_adapters import create_http_node, create_mcp_node
+from agents.utils.mcp_adapters import create_mcp_node
 from agents.utils.providers import validate_provider
 
 
@@ -25,9 +25,6 @@ class NodeConfig:
     model: str | None = None
     temperature: float | None = None
     provider: str | None = None
-    endpoint: str | None = None
-    method: str = "POST"
-    headers: dict[str, str] | None = None
     timeout_sec: float = 30.0
     mcp_command: str | None = None
     mcp_args: list[str] | None = None
@@ -76,18 +73,6 @@ def _build_python_node(node: NodeConfig) -> Callable:
     return produced
 
 
-def _build_http_node(node: NodeConfig) -> Callable:
-    if not node.endpoint:
-        raise ValueError(f"Node '{node.name}' requires 'endpoint' for http adapter.")
-    return create_http_node(
-        node_name=node.name,
-        endpoint=node.endpoint,
-        timeout_sec=node.timeout_sec,
-        method=node.method,
-        headers=node.headers,
-    )
-
-
 def _build_mcp_node(node: NodeConfig) -> Callable:
     if not node.mcp_command:
         raise ValueError(f"Node '{node.name}' requires 'mcp_command' for mcp adapter.")
@@ -133,13 +118,6 @@ def load_runtime_config(config_path: Path) -> tuple[SupervisorConfig, dict[str, 
                 else None
             ),
             provider=str(node_item["provider"]) if node_item.get("provider") is not None else None,
-            endpoint=str(node_item["endpoint"]) if node_item.get("endpoint") is not None else None,
-            method=str(node_item.get("method", "POST")),
-            headers=(
-                {str(k): str(v) for k, v in node_item["headers"].items()}
-                if node_item.get("headers") is not None
-                else None
-            ),
             timeout_sec=float(node_item.get("timeout_sec", 30.0)),
             mcp_command=(
                 str(node_item["mcp_command"])
@@ -167,14 +145,12 @@ def load_runtime_config(config_path: Path) -> tuple[SupervisorConfig, dict[str, 
 
         if node.adapter == "python":
             node_callables[node.name] = _build_python_node(node)
-        elif node.adapter == "http":
-            node_callables[node.name] = _build_http_node(node)
         elif node.adapter == "mcp":
             node_callables[node.name] = _build_mcp_node(node)
         else:
             raise ValueError(
                 f"Unsupported adapter '{node.adapter}' for node '{node.name}'. "
-                "Supported adapters: python, http, mcp."
+                "Supported adapters: python, mcp."
             )
 
     if not node_callables:

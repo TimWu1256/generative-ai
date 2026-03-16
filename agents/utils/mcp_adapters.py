@@ -2,10 +2,8 @@ from __future__ import annotations
 
 import asyncio
 import importlib
-import json
 from typing import Any
 
-import requests
 from langchain_core.messages import AIMessage, BaseMessage
 from langgraph.types import Command
 
@@ -29,53 +27,6 @@ def _state_to_payload(state: dict[str, Any]) -> dict[str, Any]:
         "messages": serialized_messages,
         "state": {k: v for k, v in state.items() if k != "messages"},
     }
-
-
-def _extract_text_from_http_response(body: Any) -> str:
-    if isinstance(body, dict):
-        for key in ("content", "output", "response", "text", "message"):
-            value = body.get(key)
-            if isinstance(value, str) and value.strip():
-                return value
-        return json.dumps(body, ensure_ascii=True)
-    if isinstance(body, list):
-        return json.dumps(body, ensure_ascii=True)
-    return str(body)
-
-
-def create_http_node(
-    *,
-    node_name: str,
-    endpoint: str,
-    timeout_sec: float = 30.0,
-    method: str = "POST",
-    headers: dict[str, str] | None = None,
-) -> Any:
-    method_normalized = method.upper()
-
-    def http_node(state) -> Command[str]:
-        payload = _state_to_payload(state)
-        response = requests.request(
-            method=method_normalized,
-            url=endpoint,
-            json=payload,
-            timeout=timeout_sec,
-            headers=headers,
-        )
-        response.raise_for_status()
-
-        try:
-            body = response.json()
-        except ValueError:
-            body = response.text
-
-        content = _extract_text_from_http_response(body)
-        return Command(
-            update={"messages": [AIMessage(content=content, name=node_name)]},
-            goto="supervisor",
-        )
-
-    return http_node
 
 
 def _extract_text_from_mcp_result(result: Any) -> str:
