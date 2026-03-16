@@ -52,7 +52,7 @@ def create_xxx_node(
 - Runtime injection:
    - `model`, `provider`, and optional `temperature` come from `config/agent_nodes.toml`.
 
-### 2) MCP adapter (`adapter = "mcp")
+### 2) MCP adapter (`adapter = "mcp"`)
 
 Your MCP server (SSE transport) must expose a tool (default `run_agent`) that accepts this payload shape:
 
