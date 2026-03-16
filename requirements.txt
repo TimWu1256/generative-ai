@@ -2,4 +2,6 @@ langchain-core
 langgraph
 langgraph-cli[inmem]
 langchain-google-genai
+langchain-openai
+langchain-anthropic
 requests
