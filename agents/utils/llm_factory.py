@@ -15,8 +15,14 @@ def create_chat_model(
     resolved_provider = validate_provider(provider, "create_chat_model")
 
     if resolved_provider == "google":
-        from langchain_google_genai import ChatGoogleGenerativeAI
-
+        try:
+            module = importlib.import_module("langchain_google_genai")
+            ChatGoogleGenerativeAI = getattr(module, "ChatGoogleGenerativeAI")
+        except (ImportError, AttributeError) as exc:
+            raise ImportError(
+                "Provider 'google' requires package 'langchain-google-genai'. "
+                "Install it with: pip install langchain-google-genai"
+            ) from exc
         return ChatGoogleGenerativeAI(model=model, temperature=temperature, **kwargs)
 
     if resolved_provider == "openai":
