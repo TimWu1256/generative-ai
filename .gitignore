@@ -101,3 +101,4 @@ lancedb/
 #
 .langgraph_api/
 graph.png
+agent_nodes.toml

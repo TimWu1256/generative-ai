@@ -1,0 +1,24 @@
+[supervisor]
+model = "gemini-2.5-flash"
+temperature = 0.7
+provider = "google"
+
+# A factory node — model and temperature are injected from config
+[[nodes]]
+name = "my_custom_agent"
+adapter = "python"
+callable = "my_team_agents.custom:create_my_custom_node"
+model = "gemini-2.5-flash"
+temperature = 0.0
+provider = "google"
+enabled = true
+
+# An MCP external agent (SSE remote)
+[[nodes]]
+name = "external_mcp_agent"
+adapter = "mcp"
+mcp_url = "https://third-party.example.com/mcp/sse"
+# mcp_headers = { Authorization = "Bearer <token>" }
+mcp_tool = "run_agent"
+timeout_sec = 20
+enabled = false
