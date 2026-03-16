@@ -3,6 +3,7 @@
 # -------------------------------------------------------------
 
 import logging
+from pathlib import Path
 
 logging.basicConfig(
     level=logging.INFO,
@@ -15,25 +16,28 @@ logger = logging.getLogger(__name__)
 # Instantiate the model
 # -------------------------------------------------------------
 
-from langchain_google_genai import ChatGoogleGenerativeAI
+from agents.utils.llm_factory import create_chat_model
+from agents.utils.runtime_config import load_runtime_config
 
-llm = ChatGoogleGenerativeAI(model="gemini-2.5-flash", temperature=0.7)
+CONFIG_PATH = Path(__file__).resolve().parents[1] / "config" / "agent_nodes.toml"
+supervisor_config, node_callables = load_runtime_config(CONFIG_PATH)
+
+llm = create_chat_model(
+    model=supervisor_config.model,
+    temperature=supervisor_config.temperature,
+    provider=supervisor_config.provider,
+)
 
 # -------------------------------------------------------------
 # Define the Supervisor Node
 # -------------------------------------------------------------
 
-from typing import Literal
 from typing_extensions import TypedDict
 from langgraph.types import Command
 from langgraph.graph import MessagesState, StateGraph, START, END
 from langchain_core.messages import HumanMessage, AIMessage, SystemMessage
 
-from agents.image_agent import image_node
-from agents.audio_agent import audio_node
-from agents.video_agent import video_node
-
-members = ["image_agent", "audio_agent", "video_agent"]
+members = list(node_callables.keys())
 options = members + ["FINISH"]
 
 system_prompt =  (
@@ -46,14 +50,14 @@ system_prompt =  (
 class Router(TypedDict):
     """Worker to route to next. If no workers needed, route to FINISH."""
 
-    next: Literal[*options]
+    next: str
 
 class State(MessagesState):
     """State with next variable for routing and completed_agents to track which agents have responded."""
     next: str
-    completed_agents: set = set()
+    completed_agents: set[str] = set()
 
-def supervisor_node(state: State) -> Command[Literal[*members, "__end__"]]:
+def supervisor_node(state: State) -> Command[str]:
     """
     Supervisor node that routes to the next agent based on the response.
 
@@ -103,8 +107,23 @@ def supervisor_node(state: State) -> Command[Literal[*members, "__end__"]]:
             goto=END,
         )
 
+    if goto == "FINISH":
+        remainders = set(members) - completed_agents
+        if remainders:
+            goto = list(remainders)[0]
+        else:
+            goto = END
+
     # ensure all agent is called only once
     elif goto in completed_agents:
+        remainders = set(members) - completed_agents
+        if remainders:
+            goto = list(remainders)[0]
+        else:
+            goto = END
+
+    # Fallback for invalid route values returned by the model.
+    elif goto not in members:
         remainders = set(members) - completed_agents
         if remainders:
             goto = list(remainders)[0]
@@ -118,10 +137,9 @@ def supervisor_node(state: State) -> Command[Literal[*members, "__end__"]]:
 # -------------------------------------------------------------
 
 graph = StateGraph(State)
-graph.add_node("supervisor", supervisor_node)
-graph.add_node("image_agent", image_node)
-graph.add_node("audio_agent", audio_node)
-graph.add_node("video_agent", video_node)
+graph.add_node("supervisor", supervisor_node, destinations=tuple(members) + (END,))
+for node_name, node_callable in node_callables.items():
+    graph.add_node(node_name, node_callable, destinations=("supervisor",))
 
 graph.add_edge(START, "supervisor")
 agent = graph.compile()
