@@ -6,6 +6,8 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Callable
 
+from agents.utils.external_adapters import create_http_node, create_mcp_node
+
 
 @dataclass(frozen=True)
 class SupervisorConfig:
@@ -17,11 +19,20 @@ class SupervisorConfig:
 @dataclass(frozen=True)
 class NodeConfig:
     name: str
+    adapter: str = "python"
     callable_path: str | None = None
     callable_type: str = "node"
     model: str | None = None
     temperature: float | None = None
     provider: str | None = None
+    endpoint: str | None = None
+    method: str = "POST"
+    headers: dict[str, str] | None = None
+    timeout_sec: float = 30.0
+    mcp_command: str | None = None
+    mcp_args: list[str] | None = None
+    mcp_tool: str = "run_agent"
+    mcp_env: dict[str, str] | None = None
     enabled: bool = True
 
 
@@ -74,6 +85,32 @@ def _build_python_node(node: NodeConfig) -> Callable:
     )
 
 
+def _build_http_node(node: NodeConfig) -> Callable:
+    if not node.endpoint:
+        raise ValueError(f"Node '{node.name}' requires 'endpoint' for http adapter.")
+    return create_http_node(
+        node_name=node.name,
+        endpoint=node.endpoint,
+        timeout_sec=node.timeout_sec,
+        method=node.method,
+        headers=node.headers,
+    )
+
+
+def _build_mcp_node(node: NodeConfig) -> Callable:
+    if not node.mcp_command:
+        raise ValueError(f"Node '{node.name}' requires 'mcp_command' for mcp adapter.")
+
+    return create_mcp_node(
+        node_name=node.name,
+        command=node.mcp_command,
+        args=node.mcp_args,
+        tool_name=node.mcp_tool,
+        timeout_sec=node.timeout_sec,
+        env=node.mcp_env,
+    )
+
+
 def load_runtime_config(config_path: Path) -> tuple[SupervisorConfig, dict[str, Callable]]:
     with config_path.open("rb") as f:
         data = tomllib.load(f)
@@ -96,6 +133,7 @@ def load_runtime_config(config_path: Path) -> tuple[SupervisorConfig, dict[str, 
     for node_item in nodes:
         node = NodeConfig(
             name=str(node_item["name"]),
+            adapter=str(node_item.get("adapter", "python")),
             callable_path=(
                 str(node_item["callable"]) if node_item.get("callable") is not None else None
             ),
@@ -107,6 +145,30 @@ def load_runtime_config(config_path: Path) -> tuple[SupervisorConfig, dict[str, 
                 else None
             ),
             provider=str(node_item["provider"]) if node_item.get("provider") is not None else None,
+            endpoint=str(node_item["endpoint"]) if node_item.get("endpoint") is not None else None,
+            method=str(node_item.get("method", "POST")),
+            headers=(
+                {str(k): str(v) for k, v in node_item["headers"].items()}
+                if node_item.get("headers") is not None
+                else None
+            ),
+            timeout_sec=float(node_item.get("timeout_sec", 30.0)),
+            mcp_command=(
+                str(node_item["mcp_command"])
+                if node_item.get("mcp_command") is not None
+                else None
+            ),
+            mcp_args=(
+                [str(item) for item in node_item.get("mcp_args", [])]
+                if node_item.get("mcp_args") is not None
+                else None
+            ),
+            mcp_tool=str(node_item.get("mcp_tool", "run_agent")),
+            mcp_env=(
+                {str(k): str(v) for k, v in node_item["mcp_env"].items()}
+                if node_item.get("mcp_env") is not None
+                else None
+            ),
             enabled=bool(node_item.get("enabled", True)),
         )
         if not node.enabled:
@@ -115,14 +177,17 @@ def load_runtime_config(config_path: Path) -> tuple[SupervisorConfig, dict[str, 
         if node.name in node_callables:
             raise ValueError(f"Duplicate node name '{node.name}' in config.")
 
-        adapter = str(node_item.get("adapter", "python"))
-        if adapter != "python":
+        if node.adapter == "python":
+            node_callables[node.name] = _build_python_node(node)
+        elif node.adapter == "http":
+            node_callables[node.name] = _build_http_node(node)
+        elif node.adapter == "mcp":
+            node_callables[node.name] = _build_mcp_node(node)
+        else:
             raise ValueError(
-                f"Unsupported adapter '{adapter}' for node '{node.name}'. "
-                "Only 'python' is supported in this configuration."
+                f"Unsupported adapter '{node.adapter}' for node '{node.name}'. "
+                "Supported adapters: python, http, mcp."
             )
-
-        node_callables[node.name] = _build_python_node(node)
 
     if not node_callables:
         raise ValueError("All configured nodes are disabled. Enable at least one node.")
