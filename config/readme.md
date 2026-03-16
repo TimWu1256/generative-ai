@@ -86,7 +86,7 @@ Tool output should include text content; runtime will extract textual fields and
 | `temperature`   | float   | no       | `null`    | Optional. Passed into the Python factory callable. |
 | `provider`      | string  | conditional | `null`    | Required when `adapter = "python"`. Allowed values: `google`, `openai`, `anthropic`. |
 | `timeout_sec`   | float   | no       | `30.0`    | Request timeout for `mcp` calls in seconds.                                |
-| `mcp_url`       | string  | no       | `null`    | SSE endpoint URL of remote MCP server. Required when `adapter = "mcp"`.    |
+| `mcp_url`       | string  | conditional | `null`    | SSE endpoint URL of remote MCP server. Required when `adapter = "mcp"`.    |
 | `mcp_headers`   | table   | no       | `null`    | Optional HTTP headers for SSE connection (for example Authorization).      |
 | `mcp_sse_read_timeout` | float | no | `300.0` | SSE stream read timeout in seconds.                                         |
 | `mcp_tool`      | string  | no       | `"run_agent"` | MCP tool name to invoke. Used when `adapter = "mcp"`.                   |
