@@ -31,14 +31,6 @@ temperature = 0.0
 enabled = true
 
 [[nodes]]
-name = "external_http_agent"
-adapter = "http"
-endpoint = "http://localhost:8080/infer"
-method = "POST"
-timeout_sec = 20
-enabled = false
-
-[[nodes]]
 name = "external_mcp_agent"
 adapter = "mcp"
 mcp_command = "python"
