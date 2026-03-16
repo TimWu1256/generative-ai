@@ -51,6 +51,3 @@ def create_audio_node(
         )
 
     return audio_node
-
-
-audio_node = create_audio_node()
