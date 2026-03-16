@@ -1,67 +1,18 @@
 from __future__ import annotations
 
+import importlib
 from typing import Any
 
-
-def _normalize_provider(provider: str) -> str:
-    aliases = {
-        "google": "google",
-        "gemini": "google",
-        "openai": "openai",
-        "anthropic": "anthropic",
-        "claude": "anthropic",
-    }
-    normalized = aliases.get(provider.strip().lower())
-    if not normalized:
-        supported = ", ".join(sorted(set(aliases.values())))
-        raise ValueError(
-            f"Unsupported provider '{provider}'. Supported providers: {supported}."
-        )
-    return normalized
-
-
-def detect_provider_from_model(model: str) -> str:
-    model_name = model.strip().lower()
-
-    if not model_name:
-        raise ValueError("Model name cannot be empty.")
-
-    if (
-        "gemini" in model_name
-        or model_name.startswith("models/gemini")
-        or model_name.startswith("google/")
-    ):
-        return "google"
-
-    if (
-        model_name.startswith("gpt")
-        or model_name.startswith("o1")
-        or model_name.startswith("o3")
-        or model_name.startswith("openai/")
-    ):
-        return "openai"
-
-    if "claude" in model_name or model_name.startswith("anthropic/"):
-        return "anthropic"
-
-    raise ValueError(
-        f"Cannot infer provider from model '{model}'. "
-        "Set provider explicitly in config (google/openai/anthropic)."
-    )
-
+from agents.utils.providers import validate_provider
 
 def create_chat_model(
     *,
     model: str,
     temperature: float,
-    provider: str | None = None,
+    provider: str,
     **kwargs: Any,
 ):
-    resolved_provider = (
-        _normalize_provider(provider)
-        if provider is not None
-        else detect_provider_from_model(model)
-    )
+    resolved_provider = validate_provider(provider, "create_chat_model")
 
     if resolved_provider == "google":
         from langchain_google_genai import ChatGoogleGenerativeAI
@@ -70,8 +21,9 @@ def create_chat_model(
 
     if resolved_provider == "openai":
         try:
-            from langchain_openai import ChatOpenAI
-        except ImportError as exc:
+            module = importlib.import_module("langchain_openai")
+            ChatOpenAI = getattr(module, "ChatOpenAI")
+        except (ImportError, AttributeError) as exc:
             raise ImportError(
                 "Provider 'openai' requires package 'langchain-openai'. "
                 "Install it with: pip install langchain-openai"
@@ -80,8 +32,9 @@ def create_chat_model(
 
     if resolved_provider == "anthropic":
         try:
-            from langchain_anthropic import ChatAnthropic
-        except ImportError as exc:
+            module = importlib.import_module("langchain_anthropic")
+            ChatAnthropic = getattr(module, "ChatAnthropic")
+        except (ImportError, AttributeError) as exc:
             raise ImportError(
                 "Provider 'anthropic' requires package 'langchain-anthropic'. "
                 "Install it with: pip install langchain-anthropic"

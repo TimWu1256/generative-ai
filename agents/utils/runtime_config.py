@@ -7,13 +7,14 @@ from pathlib import Path
 from typing import Callable
 
 from agents.utils.external_adapters import create_http_node, create_mcp_node
+from agents.utils.providers import validate_provider
 
 
 @dataclass(frozen=True)
 class SupervisorConfig:
     model: str
     temperature: float
-    provider: str | None = None
+    provider: str
 
 
 @dataclass(frozen=True)
@@ -65,13 +66,20 @@ def _build_python_node(node: NodeConfig) -> Callable:
         return symbol
 
     if node.callable_type == "factory":
+        if node.provider is None:
+            raise ValueError(
+                f"Node '{node.name}' uses callable_type='factory' and must set 'provider'."
+            )
+        if node.model is None:
+            raise ValueError(
+                f"Node '{node.name}' uses callable_type='factory' and must set 'model'."
+            )
+        normalized_provider = validate_provider(node.provider, f"Node '{node.name}'")
         kwargs = {}
-        if node.model is not None:
-            kwargs["model"] = node.model
+        kwargs["model"] = node.model
         if node.temperature is not None:
             kwargs["temperature"] = node.temperature
-        if node.provider is not None:
-            kwargs["provider"] = node.provider
+        kwargs["provider"] = normalized_provider
         produced = symbol(**kwargs)
         if not callable(produced):
             raise ValueError(
@@ -118,11 +126,9 @@ def load_runtime_config(config_path: Path) -> tuple[SupervisorConfig, dict[str, 
     supervisor_data = data.get("supervisor", {})
     model = supervisor_data.get("model", "gemini-2.5-flash")
     temperature = float(supervisor_data.get("temperature", 0.7))
-    provider = (
-        str(supervisor_data["provider"])
-        if supervisor_data.get("provider") is not None
-        else None
-    )
+    if supervisor_data.get("provider") is None:
+        raise ValueError("[supervisor] must set 'provider'.")
+    provider = validate_provider(str(supervisor_data["provider"]), "[supervisor]")
     supervisor = SupervisorConfig(model=model, temperature=temperature, provider=provider)
 
     nodes = data.get("nodes", [])

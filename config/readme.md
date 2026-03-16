@@ -23,7 +23,7 @@ This project supports config-driven worker mounting for the supervisor graph.
 |---------------|--------|----------|--------------------------------------------------|
 | `model`       | string | yes      | LLM model name for the supervisor routing agent. |
 | `temperature` | float  | yes      | Sampling temperature for the supervisor LLM.     |
-| `provider`    | string | no       | Force provider (`google`, `openai`, `anthropic`). If omitted, inferred from `model`. |
+| `provider`    | string | yes      | LLM provider (`google`, `openai`, `anthropic`). |
 
 ### `[[nodes]]` section (one per worker agent)
 
@@ -33,9 +33,9 @@ This project supports config-driven worker mounting for the supervisor graph.
 | `adapter`       | string  | yes      | —         | Adapter type: `"python"`, `"http"`, `"mcp"`.                              |
 | `callable`      | string  | no       | `null`    | Python import path in `package.module:symbol` format. Required when `adapter = "python"`. |
 | `callable_type` | string  | no       | `"node"`  | How the callable is used. See **callable_type options** below.              |
-| `model`         | string  | no       | `null`    | LLM model name passed to the node factory. Only used when `callable_type = "factory"`. |
+| `model`         | string  | conditional | `null`    | Required when `adapter = "python"` and `callable_type = "factory"`. |
 | `temperature`   | float   | no       | `null`    | Sampling temperature passed to the node factory. Only used when `callable_type = "factory"`. |
-| `provider`      | string  | no       | `null`    | Force provider (`google`, `openai`, `anthropic`). If omitted, inferred from `model`. Only used when `callable_type = "factory"`. |
+| `provider`      | string  | conditional | `null`    | Required when `adapter = "python"` and `callable_type = "factory"`. Allowed values: `google`, `openai`, `anthropic`. |
 | `endpoint`      | string  | no       | `null`    | HTTP target URL. Required when `adapter = "http"`.                          |
 | `method`        | string  | no       | `"POST"`  | HTTP method for external call. Used when `adapter = "http"`.                |
 | `headers`       | table   | no       | `null`    | HTTP headers table. Used when `adapter = "http"`.                           |
@@ -85,22 +85,13 @@ my_team.custom_agent:create_node       # callable_type = "factory"
 - Optional: `mcp_args`, `mcp_tool`, `mcp_env`, `timeout_sec`.
 - Current transport is stdio MCP server process.
 
-### Provider auto-detection
-
-- If `provider` is not set, runtime infers it from `model` automatically.
-- Current inference rules:
-   - model contains `gemini` -> `google`
-   - model starts with `gpt`, `o1`, `o3` -> `openai`
-   - model contains `claude` -> `anthropic`
-- If inference fails, set `provider` explicitly.
-
 ## Example
 
 ```toml
 [supervisor]
 model = "gemini-2.5-flash"
 temperature = 0.7
-# provider = "google"  # optional, can be omitted if model is clear
+provider = "google"
 
 # A factory node — model and temperature are injected from config
 [[nodes]]
@@ -110,7 +101,7 @@ callable = "my_team_agents.custom:create_my_custom_node"
 callable_type = "factory"
 model = "gemini-2.5-flash"
 temperature = 0.0
-# provider = "google"  # optional, can be omitted if model is clear
+provider = "google"
 enabled = true
 
 # A plain node — model is hardcoded inside the function
@@ -145,4 +136,6 @@ enabled = false
 
 - Disable a node without code changes by setting `enabled = false`.
 - Keep node names unique.
+- `provider` values are validated at startup. Allowed: `google`, `openai`, `anthropic`.
+- For `adapter = "python"` + `callable_type = "factory"`, both `model` and `provider` are required.
 - Factory callables must return a node function that routes back to `"supervisor"`.

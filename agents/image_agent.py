@@ -8,7 +8,7 @@ from agents.utils.llm_factory import create_chat_model
 def create_image_node(
     model: str = "gemini-2.5-flash",
     temperature: float = 0.0,
-    provider: str | None = None,
+    provider: str = "google",
 ):
     llm = create_chat_model(model=model, temperature=temperature, provider=provider)
 
