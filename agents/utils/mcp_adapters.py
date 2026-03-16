@@ -54,30 +54,30 @@ def _extract_text_from_mcp_result(result: Any) -> str:
     return str(result)
 
 
-async def _call_mcp_sse(
+async def _call_mcp_streamable_http(
     *,
     url: str,
     tool_name: str,
     payload: dict[str, Any],
     timeout_sec: float,
     headers: dict[str, str] | None,
-    sse_read_timeout: float,
+    read_timeout: float,
 ) -> Any:
     try:
         mcp_module = importlib.import_module("mcp")
-        mcp_sse_module = importlib.import_module("mcp.client.sse")
+        mcp_http_module = importlib.import_module("mcp.client.streamable_http")
         ClientSession = getattr(mcp_module, "ClientSession")
-        sse_client = getattr(mcp_sse_module, "sse_client")
+        streamablehttp_client = getattr(mcp_http_module, "streamablehttp_client")
     except (ImportError, AttributeError) as exc:
         raise ImportError(
             "MCP adapter requires package 'mcp'. Install it with: pip install mcp"
         ) from exc
 
-    async with sse_client(
+    async with streamablehttp_client(
         url=url,
         headers=headers,
         timeout=timeout_sec,
-        sse_read_timeout=sse_read_timeout,
+        sse_read_timeout=read_timeout,
     ) as (read_stream, write_stream):
         async with ClientSession(read_stream, write_stream) as session:
             await session.initialize()
@@ -94,17 +94,17 @@ def create_mcp_node(
     tool_name: str = "run_agent",
     timeout_sec: float = 30.0,
     headers: dict[str, str] | None = None,
-    sse_read_timeout: float = 300.0,
+    read_timeout: float = 300.0,
 ) -> Any:
     async def mcp_node(state) -> Command[str]:
         payload = _state_to_payload(state)
-        result = await _call_mcp_sse(
+        result = await _call_mcp_streamable_http(
             url=url,
             tool_name=tool_name,
             payload=payload,
             timeout_sec=timeout_sec,
             headers=headers,
-            sse_read_timeout=sse_read_timeout,
+            read_timeout=read_timeout,
         )
         content = _extract_text_from_mcp_result(result)
         return Command(

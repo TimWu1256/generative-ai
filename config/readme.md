@@ -54,7 +54,7 @@ def create_xxx_node(
 
 ### 2) MCP adapter (`adapter = "mcp"`)
 
-Your MCP server (SSE transport) must expose a tool (default `run_agent`) that accepts this payload shape:
+Your MCP server (streamable HTTP transport) must expose a tool (default `run_agent`) that accepts this payload shape:
 
 ```json
 {
@@ -86,9 +86,9 @@ Tool output should include text content; runtime will extract textual fields and
 | `temperature`   | float   | no       | `null`    | Optional. Passed into the Python factory callable. |
 | `provider`      | string  | conditional | `null`    | Required when `adapter = "python"`. Allowed values: `google`, `openai`, `anthropic`. |
 | `timeout_sec`   | float   | no       | `30.0`    | Request timeout for `mcp` calls in seconds.                                |
-| `mcp_url`       | string  | conditional | `null`    | SSE endpoint URL of remote MCP server. Required when `adapter = "mcp"`.    |
-| `mcp_headers`   | table   | no       | `null`    | Optional HTTP headers for SSE connection (for example Authorization).      |
-| `mcp_sse_read_timeout` | float | no | `300.0` | SSE stream read timeout in seconds.                                         |
+| `mcp_url`       | string  | conditional | `null`    | Streamable HTTP endpoint URL of remote MCP server. Required when `adapter = "mcp"`. |
+| `mcp_headers`   | table   | no       | `null`    | Optional HTTP headers for MCP connection (for example Authorization).      |
+| `mcp_read_timeout` | float | no | `300.0` | Stream read timeout in seconds for MCP responses.                           |
 | `mcp_tool`      | string  | no       | `"run_agent"` | MCP tool name to invoke. Used when `adapter = "mcp"`.                   |
 | `enabled`       | boolean | no       | `true`    | Set to `false` to disable the node without removing it from the config.     |
 
@@ -111,8 +111,8 @@ my_team.custom_agent:create_node
 
 - Set `adapter = "mcp"`.
 - Required field: `mcp_url`.
-- Optional: `mcp_headers`, `mcp_sse_read_timeout`, `mcp_tool`, `timeout_sec`.
-- Current transport is SSE remote MCP server.
+- Optional: `mcp_headers`, `mcp_read_timeout`, `mcp_tool`, `timeout_sec`.
+- Current transport is streamable HTTP remote MCP server.
 
 ## Example
 
@@ -132,11 +132,11 @@ temperature = 0.0
 provider = "google"
 enabled = true
 
-# An MCP external agent (SSE remote)
+# An MCP external agent (streamable HTTP remote)
 [[nodes]]
 name = "external_mcp_agent"
 adapter = "mcp"
-mcp_url = "https://third-party.example.com/mcp/sse"
+mcp_url = "https://third-party.example.com/mcp"
 # mcp_headers = { Authorization = "Bearer <token>" }
 mcp_tool = "run_agent"
 timeout_sec = 20

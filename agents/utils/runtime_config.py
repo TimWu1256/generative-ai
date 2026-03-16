@@ -28,7 +28,7 @@ class NodeConfig:
     timeout_sec: float = 30.0
     mcp_url: str | None = None
     mcp_headers: dict[str, str] | None = None
-    mcp_sse_read_timeout: float = 300.0
+    mcp_read_timeout: float = 300.0
     mcp_tool: str = "run_agent"
     enabled: bool = True
 
@@ -83,7 +83,7 @@ def _build_mcp_node(node: NodeConfig) -> Callable:
         tool_name=node.mcp_tool,
         timeout_sec=node.timeout_sec,
         headers=node.mcp_headers,
-        sse_read_timeout=node.mcp_sse_read_timeout,
+        read_timeout=node.mcp_read_timeout,
     )
 
 
@@ -125,7 +125,7 @@ def load_runtime_config(config_path: Path) -> tuple[SupervisorConfig, dict[str, 
                 if node_item.get("mcp_headers") is not None
                 else None
             ),
-            mcp_sse_read_timeout=float(node_item.get("mcp_sse_read_timeout", 300.0)),
+            mcp_read_timeout=float(node_item.get("mcp_read_timeout", 300.0)),
             mcp_tool=str(node_item.get("mcp_tool", "run_agent")),
             enabled=bool(node_item.get("enabled", True)),
         )
