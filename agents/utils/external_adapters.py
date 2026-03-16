@@ -145,17 +145,15 @@ def create_mcp_node(
 ) -> Any:
     command_args = args or []
 
-    def mcp_node(state) -> Command[str]:
+    async def mcp_node(state) -> Command[str]:
         payload = _state_to_payload(state)
-        result = asyncio.run(
-            _call_mcp_stdio(
-                command=command,
-                args=command_args,
-                tool_name=tool_name,
-                payload=payload,
-                timeout_sec=timeout_sec,
-                env=env,
-            )
+        result = await _call_mcp_stdio(
+            command=command,
+            args=command_args,
+            tool_name=tool_name,
+            payload=payload,
+            timeout_sec=timeout_sec,
+            env=env,
         )
         content = _extract_text_from_mcp_result(result)
         return Command(
