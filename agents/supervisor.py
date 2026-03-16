@@ -55,7 +55,7 @@ class Router(TypedDict):
 class State(MessagesState):
     """State with next variable for routing and completed_agents to track which agents have responded."""
     next: str
-    completed_agents: set[str]
+    completed_agents: set[str] = set()
 
 def supervisor_node(state: State) -> Command[str]:
     """
