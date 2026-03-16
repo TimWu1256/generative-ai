@@ -33,8 +33,8 @@ enabled = true
 [[nodes]]
 name = "external_mcp_agent"
 adapter = "mcp"
-mcp_command = "python"
-mcp_args = ["-m", "my_mcp_server"]
+mcp_url = "https://third-party.example.com/mcp/sse"
+# mcp_headers = { Authorization = "Bearer <token>" }
 mcp_tool = "run_agent"
 timeout_sec = 20
 enabled = false

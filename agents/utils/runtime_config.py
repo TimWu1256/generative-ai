@@ -26,10 +26,10 @@ class NodeConfig:
     temperature: float | None = None
     provider: str | None = None
     timeout_sec: float = 30.0
-    mcp_command: str | None = None
-    mcp_args: list[str] | None = None
+    mcp_url: str | None = None
+    mcp_headers: dict[str, str] | None = None
+    mcp_sse_read_timeout: float = 300.0
     mcp_tool: str = "run_agent"
-    mcp_env: dict[str, str] | None = None
     enabled: bool = True
 
 
@@ -74,16 +74,16 @@ def _build_python_node(node: NodeConfig) -> Callable:
 
 
 def _build_mcp_node(node: NodeConfig) -> Callable:
-    if not node.mcp_command:
-        raise ValueError(f"Node '{node.name}' requires 'mcp_command' for mcp adapter.")
+    if not node.mcp_url:
+        raise ValueError(f"Node '{node.name}' requires 'mcp_url' for mcp adapter.")
 
     return create_mcp_node(
         node_name=node.name,
-        command=node.mcp_command,
-        args=node.mcp_args,
+        url=node.mcp_url,
         tool_name=node.mcp_tool,
         timeout_sec=node.timeout_sec,
-        env=node.mcp_env,
+        headers=node.mcp_headers,
+        sse_read_timeout=node.mcp_sse_read_timeout,
     )
 
 
@@ -119,22 +119,14 @@ def load_runtime_config(config_path: Path) -> tuple[SupervisorConfig, dict[str, 
             ),
             provider=str(node_item["provider"]) if node_item.get("provider") is not None else None,
             timeout_sec=float(node_item.get("timeout_sec", 30.0)),
-            mcp_command=(
-                str(node_item["mcp_command"])
-                if node_item.get("mcp_command") is not None
+            mcp_url=(str(node_item["mcp_url"]) if node_item.get("mcp_url") is not None else None),
+            mcp_headers=(
+                {str(k): str(v) for k, v in node_item["mcp_headers"].items()}
+                if node_item.get("mcp_headers") is not None
                 else None
             ),
-            mcp_args=(
-                [str(item) for item in node_item.get("mcp_args", [])]
-                if node_item.get("mcp_args") is not None
-                else None
-            ),
+            mcp_sse_read_timeout=float(node_item.get("mcp_sse_read_timeout", 300.0)),
             mcp_tool=str(node_item.get("mcp_tool", "run_agent")),
-            mcp_env=(
-                {str(k): str(v) for k, v in node_item["mcp_env"].items()}
-                if node_item.get("mcp_env") is not None
-                else None
-            ),
             enabled=bool(node_item.get("enabled", True)),
         )
         if not node.enabled:
