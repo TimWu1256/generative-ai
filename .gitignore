@@ -97,3 +97,7 @@ target/
 
 # exclude lancedb from source control by default
 lancedb/
+
+#
+.langgraph_api/
+graph.png

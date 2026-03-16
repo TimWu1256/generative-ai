@@ -1,0 +1,5 @@
+langchain-core
+langgraph
+langgraph-cli[inmem]
+langchain-google-genai
+requests
