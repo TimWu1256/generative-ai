@@ -8,6 +8,8 @@ from agents.utils.runtime_models import NodeConfig
 
 
 def _import_callable(path: str) -> Callable:
+    """依據設定檔 `module:symbol` 字串載入可呼叫物件。"""
+
     module_name, sep, symbol_name = path.partition(":")
     if not sep:
         raise ValueError(
@@ -22,7 +24,11 @@ def _import_callable(path: str) -> Callable:
 
 
 class NodeBuilderRegistry:
+    """依節點設定建構實際可執行節點函式的註冊器。"""
+
     def build(self, node: NodeConfig) -> Callable:
+        """根據 adapter 類型建立節點 callable。"""
+
         if node.adapter == "python":
             return self._build_python_node(node)
         raise ValueError(
@@ -31,6 +37,8 @@ class NodeBuilderRegistry:
         )
 
     def _build_python_node(self, node: NodeConfig) -> Callable:
+        """建立 Python factory 節點並驗證輸出結果可呼叫。"""
+
         if not node.callable_path:
             raise ValueError(f"Node '{node.name}' requires 'callable' for python adapter.")
         if node.provider is None:
@@ -54,5 +62,3 @@ class NodeBuilderRegistry:
                 f"Factory callable '{node.callable_path}' did not return a callable node."
             )
         return produced
-
-    
