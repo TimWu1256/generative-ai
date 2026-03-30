@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-ALLOWED_PROVIDERS = {"google", "openai", "anthropic"}
+ALLOWED_PROVIDERS = {"google", "openai"}
 
 
 def validate_provider(provider: str, scope: str = "provider") -> str:
