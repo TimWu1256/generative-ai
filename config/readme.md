@@ -10,7 +10,7 @@ This project supports config-driven worker mounting for the supervisor graph.
 
 1. Add a worker entry under `[[nodes]]`.
 2. Set `name` to the node name used by the supervisor.
-3. Set `adapter` to one of `"python"`, `"mcp"`.
+3. Set `adapter` to `"python"`.
 4. Fill required fields for that adapter.
 5. Set `enabled = true`.
 6. Restart the service.
@@ -52,19 +52,6 @@ def create_xxx_node(
 - Runtime injection:
    - `model`, `provider`, and optional `temperature` come from `config/agent_nodes.toml`.
 
-### 2) MCP adapter (`adapter = "mcp"`)
-
-Your MCP server (streamable HTTP transport) must expose a tool (default `run_agent`) that accepts this payload shape:
-
-```json
-{
-   "messages": [...],
-   "state": {...}
-}
-```
-
-Tool output should include text content; runtime will extract textual fields and route result back to supervisor.
-
 ## Parameter Reference
 
 ### `[supervisor]` section
@@ -73,23 +60,18 @@ Tool output should include text content; runtime will extract textual fields and
 |---------------|--------|----------|--------------------------------------------------|
 | `model`       | string | yes      | LLM model name for the supervisor routing agent. |
 | `temperature` | float  | yes      | Sampling temperature for the supervisor LLM.     |
-| `provider`    | string | yes      | LLM provider (`google`, `openai`, `anthropic`). |
+| `provider`    | string | yes      | LLM provider (`google`, `openai`). |
 
 ### `[[nodes]]` section (one per worker agent)
 
 | Parameter       | Type    | Required | Default   | Description                                                                 |
 |-----------------|---------|----------|-----------|-----------------------------------------------------------------------------|
 | `name`          | string  | yes      | —         | Unique node name. Must match the routing keys used by the supervisor.        |
-| `adapter`       | string  | yes      | —         | Adapter type: `"python"`, `"mcp"`.                                      |
+| `adapter`       | string  | yes      | —         | Adapter type: `"python"`.                                      |
 | `callable`      | string  | no       | `null`    | Python import path in `package.module:symbol` format. Required when `adapter = "python"`. |
 | `model`         | string  | conditional | `null`    | Required when `adapter = "python"`. Passed into the Python factory callable. |
 | `temperature`   | float   | no       | `null`    | Optional. Passed into the Python factory callable. |
-| `provider`      | string  | conditional | `null`    | Required when `adapter = "python"`. Allowed values: `google`, `openai`, `anthropic`. |
-| `timeout_sec`   | float   | no       | `30.0`    | Request timeout for `mcp` calls in seconds.                                |
-| `mcp_url`       | string  | conditional | `null`    | Streamable HTTP endpoint URL of remote MCP server. Required when `adapter = "mcp"`. |
-| `mcp_headers`   | table   | no       | `null`    | Optional HTTP headers for MCP connection (for example Authorization).      |
-| `mcp_read_timeout` | float | no | `300.0` | Stream read timeout in seconds for MCP responses.                           |
-| `mcp_tool`      | string  | no       | `"run_agent"` | MCP tool name to invoke. Used when `adapter = "mcp"`.                   |
+| `provider`      | string  | conditional | `null`    | Required when `adapter = "python"`. Allowed values: `google`, `openai`. |
 | `enabled`       | boolean | no       | `true`    | Set to `false` to disable the node without removing it from the config.     |
 
 ### `callable` path format
@@ -106,13 +88,6 @@ package.module:symbol
 agents.image_agent:create_image_node
 my_team.custom_agent:create_node
 ```
-
-### MCP adapter
-
-- Set `adapter = "mcp"`.
-- Required field: `mcp_url`.
-- Optional: `mcp_headers`, `mcp_read_timeout`, `mcp_tool`, `timeout_sec`.
-- Current transport is streamable HTTP remote MCP server.
 
 ## Example
 
@@ -131,25 +106,15 @@ model = "gemini-2.5-flash"
 temperature = 0.0
 provider = "google"
 enabled = true
-
-# An MCP external agent (streamable HTTP remote)
-[[nodes]]
-name = "external_mcp_agent"
-adapter = "mcp"
-mcp_url = "https://third-party.example.com/mcp"
-# mcp_headers = { Authorization = "Bearer <token>" }
-mcp_tool = "run_agent"
-timeout_sec = 20
-enabled = false
 ```
 
 ## Notes
 
 - Disable a node without code changes by setting `enabled = false`.
 - Keep node names unique.
-- `provider` values are validated at startup. Allowed: `google`, `openai`, `anthropic`.
+- `provider` values are validated at startup. Allowed: `google`, `openai`.
 - For `adapter = "python"`, `callable` must point to a factory callable.
-- For `adapter = "python"`, both `model` and `provider` are required.
+-- For `adapter = "python"`, both `model` and `provider` are required.
 - Python factory callables must return a node function that routes back to `"supervisor"`.
 
 ## Minimal Python Agent Template
